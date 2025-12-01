@@ -49,17 +49,14 @@ impl Dial {
             Direction::Right => self.pos.add_assign(i32::from(mov.clicks)),
         }
         let temp = self.pos; // temporary value before clamping to the dial's range
-        // calculate the number of zero crossings
-        let xings = (self.pos.div_euclid(DIAL_SIZE)).unsigned_abs() as usize;
+        let xings = (temp / DIAL_SIZE).unsigned_abs() as usize; // calculate the number of zero crossings
         self.pos = self.pos.rem_euclid(DIAL_SIZE);
-        match (prev, temp, self.pos) {
-            // if the value was previously on zero are we're going left, we must ignore the first "crossing"
-            // which was already counted
-            (0, ..0, _) => xings - 1,
-            // if the value lands on zero, we must add 1 to the crossings to count the number times we reached zero
-            (_, ..0, 0) | (_, 0, _) => xings + 1,
-            // normal case
-            (_, ..0 | 1.., _) => xings,
+        // if going from positive to negative, we need to add 1 to account for the first zero crossing
+        // not needed if we start from exactly zero
+        if prev > 0 && temp <= 0 {
+            xings + 1
+        } else {
+            xings
         }
     }
 }
