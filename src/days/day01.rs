@@ -1,4 +1,4 @@
-use std::ops::{AddAssign, RemAssign, SubAssign};
+use std::ops::{AddAssign, SubAssign};
 
 use winnow::{
     Parser as _, Result,
@@ -40,7 +40,26 @@ impl Dial {
             Direction::Left => self.pos.sub_assign(mov.clicks as i32),
             Direction::Right => self.pos.add_assign(mov.clicks as i32),
         }
-        self.pos.rem_assign(DIAL_SIZE);
+        self.pos = self.pos.rem_euclid(DIAL_SIZE);
+    }
+
+    fn turn_check(&mut self, mov: &Move) -> usize {
+        let prev = self.pos;
+        match mov.dir {
+            Direction::Left => self.pos.sub_assign(mov.clicks as i32),
+            Direction::Right => self.pos.add_assign(mov.clicks as i32),
+        }
+        let temp = self.pos;
+        let turns = (self.pos.div_euclid(DIAL_SIZE)).unsigned_abs() as usize;
+        self.pos = self.pos.rem_euclid(DIAL_SIZE);
+        match (prev, temp, self.pos) {
+            (_, DIAL_SIZE.., _) => turns,
+            (0, ..0, _) => turns - 1,
+            (_, 0, _) => 1,
+            (_, ..0, 0) => turns + 1,
+            (_, ..0, _) => turns,
+            (_, 1..=99, _) => 0,
+        }
     }
 }
 
@@ -87,8 +106,9 @@ impl Day for Day01 {
 
     type Output2 = usize;
 
-    fn part_2(_input: &Self::Input) -> Self::Output2 {
-        unimplemented!("part_2")
+    fn part_2(input: &Self::Input) -> Self::Output2 {
+        let mut dial = Dial::default();
+        input.iter().map(|m| dial.turn_check(m)).sum()
     }
 }
 
@@ -112,5 +132,11 @@ L82";
     fn test_part1() {
         let parsed = Day01::parser(&mut INPUT).unwrap();
         assert_eq!(Day01::part_1(&parsed), 3);
+    }
+
+    #[test]
+    fn test_part2() {
+        let parsed = Day01::parser(&mut INPUT).unwrap();
+        assert_eq!(Day01::part_2(&parsed), 6);
     }
 }
