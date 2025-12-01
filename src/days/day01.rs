@@ -9,20 +9,24 @@ use winnow::{
 
 use crate::days::Day;
 
+/// The number of positions on the safe's dial
 const DIAL_SIZE: i32 = 100;
 
+/// The possible directions to turn the safe's dial
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Direction {
     Left,
     Right,
 }
 
+/// A move (turn) of the dial, in either direction for a given number of clicks.
 #[derive(Debug, Clone)]
 pub struct Move {
     dir: Direction,
     clicks: u16,
 }
 
+/// The dial state
 #[derive(Debug, Clone)]
 struct Dial {
     pos: i32,
@@ -35,36 +39,34 @@ impl Default for Dial {
 }
 
 impl Dial {
-    fn turn(&mut self, mov: &Move) {
+    /// Turn the dial according to the provided move.
+    ///
+    /// The returned value is the number of times the dial reaches the zero position during the move.
+    fn turn(&mut self, mov: &Move) -> usize {
+        let prev = self.pos; // previous value
         match mov.dir {
-            Direction::Left => self.pos.sub_assign(mov.clicks as i32),
-            Direction::Right => self.pos.add_assign(mov.clicks as i32),
+            Direction::Left => self.pos.sub_assign(i32::from(mov.clicks)),
+            Direction::Right => self.pos.add_assign(i32::from(mov.clicks)),
         }
-        self.pos = self.pos.rem_euclid(DIAL_SIZE);
-    }
-
-    fn turn_check(&mut self, mov: &Move) -> usize {
-        let prev = self.pos;
-        match mov.dir {
-            Direction::Left => self.pos.sub_assign(mov.clicks as i32),
-            Direction::Right => self.pos.add_assign(mov.clicks as i32),
-        }
-        let temp = self.pos;
-        let turns = (self.pos.div_euclid(DIAL_SIZE)).unsigned_abs() as usize;
+        let temp = self.pos; // temporary value before clamping to the dial's range
+        // calculate the number of zero crossings
+        let xings = (self.pos.div_euclid(DIAL_SIZE)).unsigned_abs() as usize;
         self.pos = self.pos.rem_euclid(DIAL_SIZE);
         match (prev, temp, self.pos) {
-            (_, DIAL_SIZE.., _) => turns,
-            (0, ..0, _) => turns - 1,
-            (_, 0, _) => 1,
-            (_, ..0, 0) => turns + 1,
-            (_, ..0, _) => turns,
-            (_, 1..=99, _) => 0,
+            // if the value was previously on zero are we're going left, we must ignore the first "crossing"
+            // which was already counted
+            (0, ..0, _) => xings - 1,
+            // if the value lands on zero, we must add 1 to the crossings to count the number times we reached zero
+            (_, ..0, 0) | (_, 0, _) => xings + 1,
+            // normal case
+            (_, ..0 | 1.., _) => xings,
         }
     }
 }
 
 pub struct Day01;
 
+/// Parse a direction character
 fn parse_dir(input: &mut &str) -> Result<Direction> {
     one_of(['L', 'R'])
         .map(|c: char| match c {
@@ -75,6 +77,7 @@ fn parse_dir(input: &mut &str) -> Result<Direction> {
         .parse_next(input)
 }
 
+/// Parse a move (input line)
 fn parse_move(input: &mut &str) -> Result<Move> {
     seq! { Move {
         dir: parse_dir,
@@ -94,21 +97,17 @@ impl Day for Day01 {
 
     fn part_1(input: &Self::Input) -> Self::Output1 {
         let mut dial = Dial::default();
-        let mut count = 0;
-        for mov in input {
+        input.iter().fold(0, |acc, mov| {
             dial.turn(mov);
-            if dial.pos == 0 {
-                count += 1;
-            }
-        }
-        count
+            if dial.pos == 0 { acc + 1 } else { acc }
+        })
     }
 
     type Output2 = usize;
 
     fn part_2(input: &Self::Input) -> Self::Output2 {
         let mut dial = Dial::default();
-        input.iter().map(|m| dial.turn_check(m)).sum()
+        input.iter().map(|m| dial.turn(m)).sum()
     }
 }
 

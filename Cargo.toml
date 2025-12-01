@@ -4,6 +4,11 @@ version = "0.1.0"
 edition = "2024"
 authors = ["Your Name <your@email.com>"]
 
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+cast_possible_truncation = "allow"
+cast_sign_loss = "allow"
+
 [dependencies]
 anyhow = "1.0.93"
 chrono = "0.4"
