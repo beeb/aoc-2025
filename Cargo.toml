@@ -2,7 +2,7 @@
 name = "aoc_202x"
 version = "0.1.0"
 edition = "2024"
-authors = ["Your Name <your@email.com>"]
+authors = ["beeb <hi@beeb.li>"]
 
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }

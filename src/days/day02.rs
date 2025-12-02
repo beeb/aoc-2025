@@ -113,7 +113,7 @@ impl Day for Day02 {
 }
 
 #[cfg(test)]
-#[allow(const_item_mutation)]
+#[expect(const_item_mutation)]
 mod tests {
     use super::*;
 
