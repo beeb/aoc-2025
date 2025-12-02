@@ -94,16 +94,17 @@ impl Day for Day02 {
                     break; // this number and larger ones are too big to be an ID
                 };
                 for range in input {
-                    if range.contains(&id) {
-                        // we only need to check for duplicates if the IDs are actually in a range of interest
-                        // this is faster than filtering before checking all ranges
-                        if set.contains(&id) {
-                            break; // this ID was already registered previously, it's a duplicate
-                        }
-                        set.insert(id);
-                        res += id;
-                        break; // it seems the ranges do not overlap so we don't need to check the other ones
+                    if !range.contains(&id) {
+                        continue;
                     }
+                    // we only need to check for duplicates if the IDs are actually in a range of interest
+                    // this is faster than filtering before checking all ranges
+                    if set.contains(&id) {
+                        break; // this ID was already registered previously, it's a duplicate
+                    }
+                    set.insert(id);
+                    res += id;
+                    break; // it seems the ranges do not overlap so we don't need to check the other ones
                 }
             }
         }
