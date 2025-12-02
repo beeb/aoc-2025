@@ -8,10 +8,13 @@ use winnow::{
 
 use crate::days::Day;
 
-const MAX_DIGITS: u32 = 10;
+const MAX_DIGITS: u32 = 10; // max digits in an ID (inferred from input)
 const MAX_SEED: usize = 10usize.pow(MAX_DIGITS / 2); // pattern needs to repeat at least twice
 
 trait IntoParts {
+    /// Split an ID into two parts with the same number of digits.
+    ///
+    /// If the ID has an even number of digits, returns None.
     fn into_parts(self) -> Option<(usize, usize)>;
 }
 
@@ -30,6 +33,9 @@ impl IntoParts for usize {
 }
 
 trait RepeatDigits {
+    /// Repeat self a number of times, so long as the resulting number of digits is <= `MAX_DIGITS`.
+    ///
+    /// Example: self = 123, repeat = 3, result = 123123123
     fn repeat_digits(self, repeat: u32) -> Option<usize>;
 }
 
@@ -37,7 +43,7 @@ impl RepeatDigits for usize {
     fn repeat_digits(self, repeat: u32) -> Option<usize> {
         let digits = self.ilog10() + 1;
         if digits * repeat > MAX_DIGITS {
-            return None;
+            return None; // no use in generating really large numbers
         }
         let mut res = self;
         for i in 1..repeat {
@@ -49,6 +55,7 @@ impl RepeatDigits for usize {
 
 pub struct Day02;
 
+/// Parse a range from the input (two unsigned integers separated by a dash).
 fn parse_range(input: &mut &str) -> Result<RangeInclusive<usize>> {
     let (start, end) = separated_pair(dec_uint, '-', dec_uint).parse_next(input)?;
     Ok(start..=end)
@@ -78,19 +85,24 @@ impl Day for Day02 {
 
     fn part_2(input: &Self::Input) -> Self::Output2 {
         let mut res = 0;
-        let mut set = HashSet::new();
+        let mut set = HashSet::new(); // deduplicate IDs of interest
+        // generate all possible IDs up to `MAX_DIGITS` in length
+        // and check if they are in one of the available ranges
         for seed in 1..MAX_SEED {
-            for repeat in 2..MAX_DIGITS {
+            for repeat in 2..=MAX_DIGITS {
                 let Some(id) = seed.repeat_digits(repeat) else {
-                    continue;
+                    break; // this number and larger ones are too big to be an ID
                 };
-                if set.contains(&id) {
-                    continue;
-                }
-                set.insert(id);
                 for range in input {
                     if range.contains(&id) {
+                        // we only need to check for duplicates if the IDs are actually in a range of interest
+                        // this is faster than filtering before checking all ranges
+                        if set.contains(&id) {
+                            break; // this ID was already registered previously, it's a duplicate
+                        }
+                        set.insert(id);
                         res += id;
+                        break; // it seems the ranges do not overlap so we don't need to check the other ones
                     }
                 }
             }
