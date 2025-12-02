@@ -8,6 +8,8 @@ use winnow::{
 
 use crate::days::Day;
 
+const MAX_DIGITS: usize = 10;
+
 trait IntoParts {
     fn into_parts(self) -> Option<(usize, usize)>;
 }
@@ -43,19 +45,14 @@ impl Day for Day02 {
     type Output1 = usize;
 
     fn part_1(input: &Self::Input) -> Self::Output1 {
-        let mut res = 0;
-        for range in input {
-            let range = range.clone();
-            for id in range {
-                let Some((first, second)) = id.into_parts() else {
-                    continue;
-                };
-                if first == second {
-                    res += id;
-                }
-            }
-        }
-        res
+        input
+            .iter()
+            .flat_map(Clone::clone)
+            .filter(|id| {
+                id.into_parts()
+                    .is_some_and(|(first, second)| first == second)
+            })
+            .sum()
     }
 
     type Output2 = usize;
