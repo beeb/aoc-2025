@@ -6,32 +6,50 @@ use crate::days::Day;
 pub struct Bank(Vec<u8>);
 
 impl Bank {
-    #[expect(clippy::cast_possible_wrap)]
+    /// Select `n` batteries from the bank to form the highest joltage when combining them, and return the joltage.
+    ///
+    /// The process to select batteries goes as follows:
+    ///
+    /// 1. Starting from the end of the bank, skip as many items as required to have enough to complete the selection
+    ///    after selecting the current battery. For example, if we still have 5 batteries left to pick to complete the
+    ///    selection, we skip the last 4. This would leave us with 4 additional batteries to pick from in case the
+    ///    5th-to-last is picked next, making the selection feasible;
+    /// 2. In the rest of the batteries to the left of that position, and up until the last battery that we previously
+    ///    picked (or the start), select the maximum value;
+    /// 3. Repeat until we have enough batteries.
     fn max_joltage(&self, n: usize) -> usize {
-        let bank_size = self.0.len() as isize;
+        let bank_size = self.0.len();
         let mut bat = Vec::new();
-        let mut idx = -1;
+        // how many batteries must we ignore to the left of the last selected one (included)
+        let mut ignore_left = 0;
         while bat.len() < n {
-            let got = bat.len();
-            let rem = n - got;
+            // remaining batteries left to pick
+            let rem = n - bat.len();
+            // iterate in reverse order, skipping (rem - 1) items (to leave enough for subsequent selection)
+            // and up until the last battery that was selected
             let (i, digit) = self
                 .0
                 .iter()
                 .enumerate()
                 .rev()
                 .skip(rem - 1)
-                .take((bank_size - idx - rem as isize) as usize)
+                .take(bank_size - ignore_left - rem + 1) // bank_size - ignore_left - (rem - 1)
                 .max_by_key(|(_, d)| **d)
                 .unwrap();
-            idx = i as isize;
-            bat.push(digit);
+            ignore_left = i + 1; // record how many batteries to ignore on the left side
+            bat.push(digit); // save the selected battery
         }
-        let mut res = 0;
-        for (i, d) in bat.into_iter().rev().enumerate() {
-            res += (*d as usize) * 10usize.pow(i as u32);
-        }
-        res
+        combine_batteries(&bat)
     }
+}
+
+/// Calculate the combined joltage for a set of batteries.
+fn combine_batteries(bat: &[&u8]) -> usize {
+    let mut res = 0;
+    for (i, d) in bat.iter().rev().enumerate() {
+        res += (**d as usize) * 10usize.pow(i as u32);
+    }
+    res
 }
 
 pub struct Day03;
