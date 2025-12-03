@@ -15,8 +15,14 @@ impl Bank {
     ///    selection, we skip the last 4. This would leave us with 4 additional batteries to pick from in case the
     ///    5th-to-last is picked next, making the selection feasible;
     /// 2. In the rest of the batteries to the left of that position, and up until the last battery that we previously
-    ///    picked (or the start), select the maximum value;
+    ///    picked (or the start of the bank), select the last maximum value (left-most battery which is a max);
     /// 3. Repeat until we have enough batteries.
+    ///
+    /// This process ensures that we maximize the left-most digit in the joltage, which has the highest significance.
+    /// The process iteratively then maximizes the next digit, which has the highest significance of the remaining
+    /// digits, etc.
+    ///
+    /// We iterate in reverse order because `max_by_key` returns the last occurrence of the max.
     fn max_joltage(&self, n: usize) -> usize {
         let bank_size = self.0.len();
         let mut bat = Vec::new();
@@ -82,7 +88,6 @@ impl Day for Day03 {
 #[cfg(test)]
 #[expect(const_item_mutation)]
 mod test {
-
     use super::*;
 
     const INPUT: &str = "987654321111111
