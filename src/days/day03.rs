@@ -6,17 +6,31 @@ use crate::days::Day;
 pub struct Bank(Vec<u8>);
 
 impl Bank {
-    fn max_joltage(&self) -> u8 {
-        let (idx, first_digit) = self
-            .0
-            .iter()
-            .enumerate()
-            .rev()
-            .skip(1)
-            .max_by_key(|(_, d)| **d)
-            .unwrap();
-        let second_digit = self.0.iter().skip(idx + 1).max().unwrap();
-        first_digit * 10 + second_digit
+    #[expect(clippy::cast_possible_wrap)]
+    fn max_joltage(&self, n: usize) -> usize {
+        let bank_size = self.0.len() as isize;
+        let mut bat = Vec::new();
+        let mut idx = -1;
+        while bat.len() < n {
+            let got = bat.len();
+            let rem = n - got;
+            let (i, digit) = self
+                .0
+                .iter()
+                .enumerate()
+                .rev()
+                .skip(rem - 1)
+                .take((bank_size - idx - rem as isize) as usize)
+                .max_by_key(|(_, d)| **d)
+                .unwrap();
+            idx = i as isize;
+            bat.push(digit);
+        }
+        let mut res = 0;
+        for (i, d) in bat.into_iter().rev().enumerate() {
+            res += (*d as usize) * 10usize.pow(i as u32);
+        }
+        res
     }
 }
 
@@ -37,13 +51,13 @@ impl Day for Day03 {
     type Output1 = usize;
 
     fn part_1(input: &Self::Input) -> Self::Output1 {
-        input.iter().map(|b| usize::from(b.max_joltage())).sum()
+        input.iter().map(|b| b.max_joltage(2)).sum()
     }
 
     type Output2 = usize;
 
-    fn part_2(_input: &Self::Input) -> Self::Output2 {
-        unimplemented!("part_2")
+    fn part_2(input: &Self::Input) -> Self::Output2 {
+        input.iter().map(|b| b.max_joltage(12)).sum()
     }
 }
 
@@ -62,5 +76,11 @@ mod test {
     fn test_part1() {
         let parsed = Day03::parser(&mut INPUT).unwrap();
         assert_eq!(Day03::part_1(&parsed), 357);
+    }
+
+    #[test]
+    fn test_part2() {
+        let parsed = Day03::parser(&mut INPUT).unwrap();
+        assert_eq!(Day03::part_2(&parsed), 3_121_910_778_619);
     }
 }
