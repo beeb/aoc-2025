@@ -7,6 +7,7 @@ authors = ["beeb <hi@beeb.li>"]
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }
 cast_possible_truncation = "allow"
+cast_possible_wrap = "allow"
 cast_sign_loss = "allow"
 
 [dependencies]

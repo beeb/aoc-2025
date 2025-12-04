@@ -1,20 +1,87 @@
-use winnow::Result;
+use std::collections::HashSet;
+
+use winnow::{
+    Parser as _, Result,
+    ascii::line_ending,
+    combinator::{repeat, separated},
+    token::one_of,
+};
 
 use crate::days::Day;
 
+const DIRS: [(i16, i16); 8] = [
+    (0, -1),  // up
+    (1, -1),  // top right
+    (1, 0),   // right
+    (1, 1),   // bottom right
+    (0, 1),   // down
+    (-1, 1),  // bottom left
+    (-1, 0),  // left
+    (-1, -1), // top left
+];
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct Point {
+    x: i16,
+    y: i16,
+}
+
+impl Point {
+    #[must_use]
+    fn offset(self, dx: i16, dy: i16) -> Self {
+        Self {
+            x: self.x + dx,
+            y: self.y + dy,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Grid(HashSet<Point>);
+
+impl Grid {
+    fn count_neighbours(&self, at: Point) -> usize {
+        DIRS.iter()
+            .filter(|(dx, dy)| self.0.contains(&at.offset(*dx, *dy)))
+            .count()
+    }
+}
+
 pub struct Day04;
 
-impl Day for Day04 {
-    type Input = String;
+fn parse_line(input: &mut &str) -> Result<Vec<bool>> {
+    let cells: Vec<_> = repeat(1.., one_of(('.', '@'))).parse_next(input)?;
+    Ok(cells.into_iter().map(|c| c == '@').collect())
+}
 
-    fn parser(_input: &mut &str) -> Result<Self::Input> {
-        unimplemented!("parser")
+impl Day for Day04 {
+    type Input = Grid;
+
+    fn parser(input: &mut &str) -> Result<Self::Input> {
+        let lines: Vec<_> = separated(1.., parse_line, line_ending).parse_next(input)?;
+        let mut grid = HashSet::new();
+        for (y, line) in lines.into_iter().enumerate() {
+            for (x, cell) in line.into_iter().enumerate() {
+                if !cell {
+                    continue;
+                }
+                grid.insert(Point {
+                    x: x as i16,
+                    y: y as i16,
+                });
+            }
+        }
+        Ok(Grid(grid))
     }
 
     type Output1 = usize;
 
-    fn part_1(_input: &Self::Input) -> Self::Output1 {
-        unimplemented!("part_1")
+    fn part_1(input: &Self::Input) -> Self::Output1 {
+        input
+            .0
+            .iter()
+            .filter(|p| input.count_neighbours(**p) < 4)
+            .count()
     }
 
     type Output2 = usize;
