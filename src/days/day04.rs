@@ -47,6 +47,7 @@ impl Grid {
     }
 }
 
+/// Get the positions of all accessible paper rolls
 fn get_accessible(grid: &Grid) -> Option<Vec<Point>> {
     let accessible: Vec<_> = grid
         .0
@@ -63,6 +64,7 @@ fn get_accessible(grid: &Grid) -> Option<Vec<Point>> {
 
 pub struct Day04;
 
+/// Parse a row of the grid, returning a boolean for each cell in the row to indicate whether a paper roll is present.
 fn parse_line(input: &mut &str) -> Result<Vec<bool>> {
     let cells: Vec<_> = repeat(1.., one_of(('.', '@'))).parse_next(input)?;
     Ok(cells.into_iter().map(|c| c == '@').collect())
