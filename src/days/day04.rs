@@ -47,6 +47,20 @@ impl Grid {
     }
 }
 
+fn get_accessible(grid: &Grid) -> Option<Vec<Point>> {
+    let accessible: Vec<_> = grid
+        .0
+        .iter()
+        .filter(|p| grid.count_neighbours(**p) < 4)
+        .copied()
+        .collect();
+    if accessible.is_empty() {
+        None
+    } else {
+        Some(accessible)
+    }
+}
+
 pub struct Day04;
 
 fn parse_line(input: &mut &str) -> Result<Vec<bool>> {
@@ -77,16 +91,19 @@ impl Day for Day04 {
     type Output1 = usize;
 
     fn part_1(input: &Self::Input) -> Self::Output1 {
-        input
-            .0
-            .iter()
-            .filter(|p| input.count_neighbours(**p) < 4)
-            .count()
+        get_accessible(input).unwrap().len()
     }
 
     type Output2 = usize;
 
-    fn part_2(_input: &Self::Input) -> Self::Output2 {
-        unimplemented!("part_2")
+    fn part_2(input: &Self::Input) -> Self::Output2 {
+        let mut grid = input.clone();
+        let init_rolls = grid.0.len();
+        while let Some(accessible) = get_accessible(&grid) {
+            for rem in accessible {
+                grid.0.remove(&rem);
+            }
+        }
+        init_rolls - grid.0.len()
     }
 }
