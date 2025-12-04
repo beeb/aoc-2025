@@ -55,11 +55,7 @@ fn get_accessible(grid: &Grid) -> Option<Vec<Point>> {
         .filter(|p| grid.count_neighbours(**p) < 4)
         .copied()
         .collect();
-    if accessible.is_empty() {
-        None
-    } else {
-        Some(accessible)
-    }
+    (!accessible.is_empty()).then_some(accessible)
 }
 
 pub struct Day04;
