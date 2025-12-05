@@ -16,6 +16,7 @@ fn parse_range(input: &mut &str) -> Result<RangeInclusive<usize>> {
     Ok(start..=end)
 }
 
+/// Parse a list of ranges (one per line).
 fn parse_ranges(input: &mut &str) -> Result<Vec<RangeInclusive<usize>>> {
     separated(1.., parse_range, newline).parse_next(input)
 }
@@ -46,16 +47,20 @@ impl Day for Day05 {
 
     fn part_2(input: &Self::Input) -> Self::Output2 {
         let (ranges, _) = input;
+        // sorting the ranges by start ID so that we can merge them easily in one pass
         let mut ranges = ranges.clone();
         ranges.sort_unstable_by_key(|r| *r.start());
+        // accumulate the merged ranges into a new list
         let mut merged = Vec::<RangeInclusive<usize>>::new();
         for range in &ranges {
-            if let Some(into) = merged
-                .iter_mut()
-                .find(|r| r.contains(range.start()) || r.contains(range.end()))
+            // check if the current range intersects with the last one that was pushed to the merged list
+            if let Some(into) = merged.last_mut()
+                && into.contains(range.start())
             {
-                *into = *into.start().min(range.start())..=*into.end().max(range.end());
+                // update the `end` of the last range in the merged list
+                *into = *into.start()..=*into.end().max(range.end());
             } else {
+                // this range does not intersect, no merging needed
                 merged.push(range.clone());
             }
         }
