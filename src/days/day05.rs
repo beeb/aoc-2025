@@ -46,25 +46,20 @@ impl Day for Day05 {
 
     fn part_2(input: &Self::Input) -> Self::Output2 {
         let (ranges, _) = input;
-        let mut unmerged = ranges.clone();
-        unmerged.sort_unstable_by_key(|r| *r.start());
-        loop {
-            let mut merged = Vec::<RangeInclusive<usize>>::new();
-            for range in &unmerged {
-                if let Some(into) = merged
-                    .iter_mut()
-                    .find(|r| r.contains(range.start()) || r.contains(range.end()))
-                {
-                    *into = *into.start().min(range.start())..=*into.end().max(range.end());
-                } else {
-                    merged.push(range.clone());
-                }
+        let mut ranges = ranges.clone();
+        ranges.sort_unstable_by_key(|r| *r.start());
+        let mut merged = Vec::<RangeInclusive<usize>>::new();
+        for range in &ranges {
+            if let Some(into) = merged
+                .iter_mut()
+                .find(|r| r.contains(range.start()) || r.contains(range.end()))
+            {
+                *into = *into.start().min(range.start())..=*into.end().max(range.end());
+            } else {
+                merged.push(range.clone());
             }
-            if merged.len() == unmerged.len() {
-                return merged.into_iter().map(Iterator::count).sum();
-            }
-            unmerged = merged;
         }
+        merged.into_iter().map(Iterator::count).sum()
     }
 }
 
