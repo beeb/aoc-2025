@@ -22,6 +22,16 @@ pub struct Problem {
     op: Operator,
 }
 
+impl Problem {
+    /// Compute the solution for the problem
+    fn compute(&self) -> usize {
+        match self.op {
+            Operator::Add => self.numbers.iter().sum(),
+            Operator::Mul => self.numbers.iter().product(),
+        }
+    }
+}
+
 use crate::days::Day;
 
 pub struct Day06;
@@ -87,10 +97,10 @@ impl Day for Day06 {
             })
             .collect();
 
-        // digits interpretation for part 2 (column-wise already, right to left)
+        // digits interpretation for part 2 (column-wise already, left to right)
         let mut part2_numbers: Vec<Vec<usize>> = vec![vec![]];
-        // iterate over the columns in reverse order, simultaneously (starting at the end of each line)
-        for i in (0..digits[0].len()).rev() {
+        // iterate over the columns, simultaneously
+        for i in 0..digits[0].len() {
             // gather the digits in the column
             let pos_digits: Vec<_> = digits.iter().map(|line| *line.get(i).unwrap()).collect();
             // if all the characters are spaces, this is a separator column which means we need to move onto the next
@@ -106,7 +116,8 @@ impl Day for Day06 {
                     pos_digits
                         .into_iter()
                         .rev()
-                        .filter_map(|c| if c == ' ' { None } else { Some(c as u8 - b'0') }) // ignore spaces
+                        .filter(|c| c != &' ') // ignore spaces
+                        .map(|c| c as u8 - b'0')
                         .enumerate()
                         .map(|(i, d)| d as usize * 10usize.pow(i as u32))
                         .sum(),
@@ -123,11 +134,8 @@ impl Day for Day06 {
                 })
                 .collect(),
             ops.iter()
-                .zip(part2_numbers.iter().rev()) // need to reverse because operators are left to right
-                .map(|(op, numbers)| Problem {
-                    numbers: numbers.clone(),
-                    op: *op,
-                })
+                .zip(part2_numbers)
+                .map(|(op, numbers)| Problem { numbers, op: *op })
                 .collect(),
         ))
     }
@@ -136,26 +144,14 @@ impl Day for Day06 {
 
     fn part_1(input: &Self::Input) -> Self::Output1 {
         let (input, _) = input;
-        input
-            .iter()
-            .map(|p| match p.op {
-                Operator::Add => p.numbers.iter().sum::<usize>(),
-                Operator::Mul => p.numbers.iter().product(),
-            })
-            .sum()
+        input.iter().map(Problem::compute).sum()
     }
 
     type Output2 = usize;
 
     fn part_2(input: &Self::Input) -> Self::Output2 {
         let (_, input) = input;
-        input
-            .iter()
-            .map(|p| match p.op {
-                Operator::Add => p.numbers.iter().sum::<usize>(),
-                Operator::Mul => p.numbers.iter().product(),
-            })
-            .sum()
+        input.iter().map(Problem::compute).sum()
     }
 }
 
