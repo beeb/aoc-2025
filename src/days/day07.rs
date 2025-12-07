@@ -68,6 +68,8 @@ impl Manifold {
         self.beams.get(&splitter.above()).copied()
     }
 
+    /// Project the source beam into the manifold, keeping track of how many possible paths go through each position
+    /// and recording the total number of splits (the return value).
     fn project_beams(&mut self) -> usize {
         self.beams.insert(
             Point {
@@ -76,51 +78,52 @@ impl Manifold {
             },
             1, // 1 path goes through the initial beam
         );
-        let mut count_splits = 0; // counter for total splits
+        let mut n_splits = 0; // counter for total splits
         for y in 2..LINES {
             let range = Point { y, x: 0 }..Point { y, x: COLUMNS };
             if y % 2 == 0 {
                 // check all splitters on this line (only even lines have splitters)
                 for p in self.splitters.range(range.clone()) {
-                    let Some(paths) = self.receives_beam(*p) else {
+                    let Some(n) = self.receives_beam(*p) else {
+                        // the splitter doesn't receive any beam as input
                         continue;
                     };
-                    // if the splitter receives `paths` paths as input
-                    count_splits += 1; // count the splitter
-                    // split the beam, indicating that `paths` paths are propagated to either side
+                    // the splitter receives `n` possible beams as input
+                    n_splits += 1; // count the splitter
+                    // split the beam, indicating that `n` paths are propagated to either side
                     // and potentially summing with any existing paths count at that location
-                    let left = *self
+                    let n_left = *self
                         .beams
                         .entry(p.left())
-                        .and_modify(|p| *p += paths)
-                        .or_insert(paths);
-                    let right = *self
+                        .and_modify(|p| *p += n)
+                        .or_insert(n);
+                    let n_right = *self
                         .beams
                         .entry(p.right())
-                        .and_modify(|p| *p += paths)
-                        .or_insert(paths);
+                        .and_modify(|p| *p += n)
+                        .or_insert(n);
                     // propagate the beams down to the next line which doesn't contain splitters
                     // keeping the same number of paths
-                    self.beams.insert(p.left().below(), left);
-                    self.beams.insert(p.right().below(), right);
+                    self.beams.insert(p.left().below(), n_left);
+                    self.beams.insert(p.right().below(), n_right);
                 }
             }
             // check all beams on this line (including the ones we just split)
-            for (p, paths) in self
+            for (p, n) in self
                 .beams
                 .range(range)
-                .map(|(p, v)| (*p, *v))
+                .map(|(p, n)| (*p, *n))
                 .collect::<Vec<_>>()
             {
                 // propagate beams down keeping the same count
                 // but only if there isn't a splitter there
                 let below = p.below();
                 if !self.splitters.contains(&below) {
-                    self.beams.insert(below, paths);
+                    self.beams.insert(below, n);
                 }
             }
         }
-        count_splits
+        n_splits
     }
 }
 
