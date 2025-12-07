@@ -19,10 +19,35 @@ pub struct Point {
 }
 
 impl Point {
+    /// Gets the position directly above self
     fn above(self) -> Point {
         Point {
             y: self.y - 1,
             x: self.x,
+        }
+    }
+
+    /// Gets the position directly below self
+    fn below(self) -> Point {
+        Point {
+            y: self.y + 1,
+            x: self.x,
+        }
+    }
+
+    /// Gets the position directly to the left of self
+    fn left(self) -> Point {
+        Point {
+            y: self.y,
+            x: self.x - 1,
+        }
+    }
+
+    /// Gets the position directly to the right of self
+    fn right(self) -> Point {
+        Point {
+            y: self.y,
+            x: self.x + 1,
         }
     }
 }
@@ -51,40 +76,36 @@ impl Manifold {
             },
             1, // 1 path goes through the initial beam
         );
-        let mut count_splits = 0;
+        let mut count_splits = 0; // counter for total splits
         for y in 2..LINES {
             for x in 0..COLUMNS {
                 let p = Point { y, x };
                 if self.splitters.contains(&p)
                     && let Some(paths) = self.receives_beam(p)
                 {
-                    count_splits += 1;
+                    // if we're visiting a splitter and the splitter receives `paths` paths as input
+                    count_splits += 1; // count the splitter
+                    // split the beam, indicating that `paths` paths are propagated to either side
+                    // and potentially summing with any existing paths count at that location
                     let left = *self
                         .beams
-                        .entry(Point { y: p.y, x: p.x - 1 })
+                        .entry(p.left())
                         .and_modify(|p| *p += paths)
                         .or_insert(paths);
                     let right = *self
                         .beams
-                        .entry(Point { y: p.y, x: p.x + 1 })
+                        .entry(p.right())
                         .and_modify(|p| *p += paths)
                         .or_insert(paths);
-                    self.beams.insert(
-                        Point {
-                            y: p.y + 1,
-                            x: p.x - 1,
-                        },
-                        left,
-                    );
-                    self.beams.insert(
-                        Point {
-                            y: p.y + 1,
-                            x: p.x + 1,
-                        },
-                        right,
-                    );
+                    // propagate the beams down to the next line which doesn't contain splitters
+                    // keeping the same number of paths
+                    self.beams.insert(p.left().below(), left);
+                    self.beams.insert(p.right().below(), right);
                 } else if let Some(paths) = self.beams.get(&p) {
-                    self.beams.insert(Point { y: p.y + 1, x: p.x }, *paths);
+                    // propagate beams down keeping the same count
+                    // (we put extra beams in the same location as splitters but it doesn't matter
+                    // since we don't visit them in case there is a splitter there)
+                    self.beams.insert(p.below(), *paths);
                 }
             }
         }
@@ -148,6 +169,7 @@ impl Day for Day07 {
     fn part_2(input: &Self::Input) -> Self::Output2 {
         let mut manifold = input.clone();
         manifold.project_beams();
+        // sum up all the paths reaching the last line
         let last_line = Point { y: LINES - 1, x: 0 }..Point {
             y: LINES - 1,
             x: COLUMNS,
