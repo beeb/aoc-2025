@@ -78,12 +78,14 @@ impl Manifold {
         );
         let mut count_splits = 0; // counter for total splits
         for y in 2..LINES {
-            for x in 0..COLUMNS {
-                let p = Point { y, x };
-                if self.splitters.contains(&p)
-                    && let Some(paths) = self.receives_beam(p)
-                {
-                    // if we're visiting a splitter and the splitter receives `paths` paths as input
+            let range = Point { y, x: 0 }..Point { y, x: COLUMNS };
+            if y % 2 == 0 {
+                // check all splitters on this line (only even lines have splitters)
+                for p in self.splitters.range(range.clone()) {
+                    let Some(paths) = self.receives_beam(*p) else {
+                        continue;
+                    };
+                    // if the splitter receives `paths` paths as input
                     count_splits += 1; // count the splitter
                     // split the beam, indicating that `paths` paths are propagated to either side
                     // and potentially summing with any existing paths count at that location
@@ -101,11 +103,20 @@ impl Manifold {
                     // keeping the same number of paths
                     self.beams.insert(p.left().below(), left);
                     self.beams.insert(p.right().below(), right);
-                } else if let Some(paths) = self.beams.get(&p) {
-                    // propagate beams down keeping the same count
-                    // (we put extra beams in the same location as splitters but it doesn't matter
-                    // since we don't visit them in case there is a splitter there)
-                    self.beams.insert(p.below(), *paths);
+                }
+            }
+            // check all beams on this line (including the ones we just split)
+            for (p, paths) in self
+                .beams
+                .range(range)
+                .map(|(p, v)| (*p, *v))
+                .collect::<Vec<_>>()
+            {
+                // propagate beams down keeping the same count
+                // but only if there isn't a splitter there
+                let below = p.below();
+                if !self.splitters.contains(&below) {
+                    self.beams.insert(below, paths);
                 }
             }
         }
