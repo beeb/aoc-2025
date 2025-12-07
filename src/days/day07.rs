@@ -1,4 +1,7 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    num::NonZeroUsize,
+};
 
 use winnow::{
     Parser as _, Result,
@@ -59,12 +62,12 @@ pub struct Manifold {
     /// Positions of all splitters
     splitters: BTreeSet<Point>,
     /// For each beam position, how many paths go through here
-    beams: BTreeMap<Point, usize>,
+    beams: BTreeMap<Point, NonZeroUsize>,
 }
 
 impl Manifold {
     /// Return whether a beam enter the splitter, and how many paths go through that position
-    fn receives_beam(&self, splitter: Point) -> Option<usize> {
+    fn receives_beam(&self, splitter: Point) -> Option<NonZeroUsize> {
         self.beams.get(&splitter.above()).copied()
     }
 
@@ -76,7 +79,7 @@ impl Manifold {
                 y: 1,
                 x: self.start.x,
             },
-            1, // 1 path goes through the initial beam
+            NonZeroUsize::MIN, // 1 path goes through the initial beam
         );
         let mut n_splits = 0; // counter for total splits
         for y in 2..LINES {
@@ -95,12 +98,12 @@ impl Manifold {
                     let n_left = *self
                         .beams
                         .entry(p.left())
-                        .and_modify(|p| *p += n)
+                        .and_modify(|p| *p = p.saturating_add(n.into()))
                         .or_insert(n);
                     let n_right = *self
                         .beams
                         .entry(p.right())
-                        .and_modify(|p| *p += n)
+                        .and_modify(|p| *p = p.saturating_add(n.into()))
                         .or_insert(n);
                     // propagate the beams down to the next line which doesn't contain splitters
                     // keeping the same number of paths
@@ -191,7 +194,7 @@ impl Day for Day07 {
         manifold
             .beams
             .range(last_line)
-            .map(|(_, paths)| *paths)
+            .map(|(_, paths)| usize::from(*paths))
             .sum()
     }
 }
