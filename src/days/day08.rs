@@ -77,7 +77,7 @@ impl Day for Day08 {
         for (d, a, b) in dist.into_iter().take(NUM_CONNECTIONS) {
             graph.add_edge(a, b, d);
         }
-        let mut nets = Vec::new();
+        let mut nets_sizes = Vec::new();
         let mut visited = HashSet::new();
         for node in graph.node_indices() {
             if graph.neighbors(node).count() == 0 {
@@ -92,10 +92,10 @@ impl Day for Day08 {
                 visited.insert(node);
                 nodes.push(node);
             }
-            nets.push(nodes);
+            nets_sizes.push(Reverse(nodes.len()));
         }
-        nets.into_iter()
-            .map(|nodes| Reverse(nodes.len()))
+        nets_sizes
+            .into_iter()
             .sorted_unstable()
             .take(3)
             .map(|l| l.0)
