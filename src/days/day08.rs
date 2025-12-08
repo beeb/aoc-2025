@@ -24,6 +24,7 @@ pub struct Point {
 }
 
 impl Point {
+    /// Calculate the squared distance between two points
     fn dist_squared(&self, other: &Point) -> usize {
         let x_dist = self.x.abs_diff(other.x);
         let y_dist = self.y.abs_diff(other.y);
@@ -32,10 +33,11 @@ impl Point {
     }
 }
 
-fn get_all_dist(graph: &UnGraph<Point, usize>) -> Vec<(usize, NodeIndex, NodeIndex)> {
+/// Calculate the distances between all pairs of junction boxes and return them in ascending distance order
+fn get_all_dist_sorted(graph: &UnGraph<Point, ()>) -> Vec<(usize, NodeIndex, NodeIndex)> {
     let mut dist = Vec::new();
-    for nodes in graph.node_indices().combinations_with_replacement(2) {
-        let [a, b, ..] = nodes.as_slice() else {
+    for pair in graph.node_indices().combinations_with_replacement(2) {
+        let [a, b, ..] = pair.as_slice() else {
             unreachable!();
         };
         if a == b {
@@ -51,16 +53,18 @@ fn get_all_dist(graph: &UnGraph<Point, usize>) -> Vec<(usize, NodeIndex, NodeInd
 
 pub struct Day08;
 
+/// Parse a point from its coordinates list
 fn parse_point(input: &mut &str) -> Result<Point> {
     let (x, _, y, _, z) = (dec_uint, ',', dec_uint, ',', dec_uint).parse_next(input)?;
     Ok(Point { x, y, z })
 }
 
 impl Day for Day08 {
-    type Input = UnGraph<Point, usize>;
+    type Input = UnGraph<Point, ()>;
 
     fn parser(input: &mut &str) -> Result<Self::Input> {
         let points: Vec<_> = separated(1.., parse_point, newline).parse_next(input)?;
+        // construct graph with all unconnected nodes
         let mut graph = UnGraph::with_capacity(points.len(), 1000);
         for p in points {
             graph.add_node(p);
@@ -72,27 +76,33 @@ impl Day for Day08 {
 
     fn part_1(input: &Self::Input) -> Self::Output1 {
         let mut graph = input.clone();
-        // record all pairs' distances
-        let dist = get_all_dist(&graph);
-        for (d, a, b) in dist.into_iter().take(NUM_CONNECTIONS) {
-            graph.add_edge(a, b, d);
+        // compute all pairs' distances and iterate over them in ascending order up to the number
+        // of connections required
+        let dist = get_all_dist_sorted(&graph);
+        for (_, a, b) in dist.into_iter().take(NUM_CONNECTIONS) {
+            // link the two junctions boxes together
+            graph.add_edge(a, b, ());
         }
+        // find all the nets and record their cardinality
         let mut nets_sizes = Vec::new();
-        let mut visited = HashSet::new();
+        let mut visited = HashSet::new(); // we want to only visit each node once
         for node in graph.node_indices() {
             if graph.neighbors(node).count() == 0 {
+                // unconnected nodes can be ignored
                 continue;
             }
             if visited.contains(&node) {
+                // already visited nodes must be ignored
                 continue;
             }
+            // visit all connected nodes and record the size of the net
             let mut visitor = DfsPostOrder::new(&graph, node);
-            let mut nodes = Vec::new();
+            let mut cardinality = 0;
             while let Some(node) = visitor.next(&graph) {
                 visited.insert(node);
-                nodes.push(node);
+                cardinality += 1;
             }
-            nets_sizes.push(Reverse(nodes.len()));
+            nets_sizes.push(Reverse(cardinality)); // we want to sort in descending order hence the `Reverse`
         }
         nets_sizes
             .into_iter()
@@ -107,9 +117,9 @@ impl Day for Day08 {
     fn part_2(input: &Self::Input) -> Self::Output2 {
         let mut graph = input.clone();
         // record all pairs' distances
-        let dist = get_all_dist(&graph);
-        for (d, a, b) in dist {
-            graph.add_edge(a, b, d);
+        let dist = get_all_dist_sorted(&graph);
+        for (_, a, b) in dist {
+            graph.add_edge(a, b, ());
             if connected_components(&graph) == 1 {
                 return graph.node_weight(a).unwrap().x * graph.node_weight(b).unwrap().x;
             }
