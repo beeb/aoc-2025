@@ -1,7 +1,11 @@
 use std::{cmp::Reverse, collections::HashSet};
 
 use itertools::Itertools;
-use petgraph::{graph::UnGraph, visit::DfsPostOrder};
+use petgraph::{
+    algo::connected_components,
+    graph::{NodeIndex, UnGraph},
+    visit::DfsPostOrder,
+};
 use winnow::{
     Parser as _, Result,
     ascii::{dec_uint, newline},
@@ -28,6 +32,23 @@ impl Point {
     }
 }
 
+fn get_all_dist(graph: &UnGraph<Point, usize>) -> Vec<(usize, NodeIndex, NodeIndex)> {
+    let mut dist = Vec::new();
+    for nodes in graph.node_indices().combinations_with_replacement(2) {
+        let [a, b, ..] = nodes.as_slice() else {
+            unreachable!();
+        };
+        if a == b {
+            continue;
+        }
+        let pa = graph.node_weight(*a).unwrap();
+        let pb = graph.node_weight(*b).unwrap();
+        dist.push((pa.dist_squared(pb), *a, *b));
+    }
+    dist.sort_unstable_by_key(|(d, _, _)| *d);
+    dist
+}
+
 pub struct Day08;
 
 fn parse_point(input: &mut &str) -> Result<Point> {
@@ -52,19 +73,7 @@ impl Day for Day08 {
     fn part_1(input: &Self::Input) -> Self::Output1 {
         let mut graph = input.clone();
         // record all pairs' distances
-        let mut dist = Vec::new();
-        for nodes in graph.node_indices().combinations_with_replacement(2) {
-            let [a, b, ..] = nodes.as_slice() else {
-                unreachable!();
-            };
-            if a == b {
-                continue;
-            }
-            let pa = graph.node_weight(*a).unwrap();
-            let pb = graph.node_weight(*b).unwrap();
-            dist.push((pa.dist_squared(pb), *a, *b));
-        }
-        dist.sort_unstable_by_key(|(d, _, _)| *d);
+        let dist = get_all_dist(&graph);
         for (d, a, b) in dist.into_iter().take(NUM_CONNECTIONS) {
             graph.add_edge(a, b, d);
         }
@@ -95,8 +104,17 @@ impl Day for Day08 {
 
     type Output2 = usize;
 
-    fn part_2(_input: &Self::Input) -> Self::Output2 {
-        unimplemented!("part_2")
+    fn part_2(input: &Self::Input) -> Self::Output2 {
+        let mut graph = input.clone();
+        // record all pairs' distances
+        let dist = get_all_dist(&graph);
+        for (d, a, b) in dist {
+            graph.add_edge(a, b, d);
+            if connected_components(&graph) == 1 {
+                return graph.node_weight(a).unwrap().x * graph.node_weight(b).unwrap().x;
+            }
+        }
+        0
     }
 }
 
@@ -135,6 +153,6 @@ mod tests {
     #[test]
     fn test_part2() {
         let parsed = Day08::parser(&mut INPUT).unwrap();
-        assert_eq!(Day08::part_2(&parsed), 40);
+        assert_eq!(Day08::part_2(&parsed), 25_272);
     }
 }
