@@ -15,5 +15,6 @@ anyhow = "1.0.93"
 chrono = "0.4"
 clap = { version = "4", features = ["derive"] }
 itertools = "0.14"
+petgraph = "0.8.3"
 ureq = "3.1.4"
 winnow = "0.7"
