@@ -104,6 +104,7 @@ impl Day for Day08 {
             }
             nets_sizes.push(Reverse(cardinality)); // we want to sort in descending order hence the `Reverse`
         }
+        // multiply the size of the 3 largest nets
         nets_sizes
             .into_iter()
             .sorted_unstable()
@@ -116,11 +117,14 @@ impl Day for Day08 {
 
     fn part_2(input: &Self::Input) -> Self::Output2 {
         let mut graph = input.clone();
-        // record all pairs' distances
+        // compute all pairs' distances and iterate over them in ascending order
+        // until all nodes are part of a single net
         let dist = get_all_dist_sorted(&graph);
         for (_, a, b) in dist {
             graph.add_edge(a, b, ());
+            // small shortcut here, but we could have done it the same way as part 1
             if connected_components(&graph) == 1 {
+                // by connecting the last pair, all nodes are connected to each other, we're done!
                 return graph.node_weight(a).unwrap().x * graph.node_weight(b).unwrap().x;
             }
         }
