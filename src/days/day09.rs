@@ -38,16 +38,17 @@ fn range(a: usize, b: usize) -> RangeInclusive<usize> {
 
 pub struct Day09;
 
-fn parse_point(input: &mut &str) -> Result<(usize, usize)> {
-    separated_pair(dec_uint, ',', dec_uint).parse_next(input)
+fn parse_point(input: &mut &str) -> Result<Point> {
+    separated_pair(dec_uint, ',', dec_uint)
+        .map(|(x, y)| Point { x, y })
+        .parse_next(input)
 }
 
 impl Day for Day09 {
     type Input = Vec<Point>;
 
     fn parser(input: &mut &str) -> Result<Self::Input> {
-        let points: Vec<_> = separated(1.., parse_point, newline).parse_next(input)?;
-        Ok(points.into_iter().map(|(x, y)| Point { x, y }).collect())
+        separated(1.., parse_point, newline).parse_next(input)
     }
 
     type Output1 = usize;
