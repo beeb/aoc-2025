@@ -89,6 +89,9 @@ impl From<&[u8]> for Button {
 }
 
 /// Reconstruct the path (which buttons were pressed in which order) for A*
+///
+/// Not actually used but kept for reference
+#[allow(unused)]
 fn path(came_from: &HashMap<Lights, Button>, current: Lights) -> VecDeque<Button> {
     let mut path: VecDeque<Button> = VecDeque::new();
     let mut current = current;
@@ -104,7 +107,7 @@ fn path(came_from: &HashMap<Lights, Button>, current: Lights) -> VecDeque<Button
 fn a_star(buttons: &[Button], start: Lights, target: Lights) -> Option<usize> {
     #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
     struct Candidate {
-        cost: Reverse<u32>,
+        cost: Reverse<usize>,
         state: Lights,
     }
     let mut open_set = BinaryHeap::<Candidate>::new(); // min-heap thanks to Reverse
@@ -112,22 +115,23 @@ fn a_star(buttons: &[Button], start: Lights, target: Lights) -> Option<usize> {
         cost: Reverse(1),
         state: start,
     });
-    let mut came_from = HashMap::<Lights, Button>::new(); // find back the path taken
-    let mut dist = HashMap::<Lights, u32>::new(); // travelled distance (number of buttons pressed)
+    // let mut came_from = HashMap::<Lights, Button>::new(); // if we need to find back the path taken
+    let mut dist = HashMap::<Lights, usize>::new(); // traveled distance (number of buttons pressed)
     dist.insert(start, 0);
 
     while let Some(current) = open_set.pop() {
         if current.state == target {
-            let path = path(&came_from, current.state);
-            return Some(path.len());
+            // we could get the path back if we wanted (not needed here)
+            // let path = path(&came_from, current.state);
+            return dist.get(&current.state).copied();
         }
 
         for button in buttons {
             let n = current.state.press_button(*button);
             // total number of button pressed if we pressed this button
             let tentative_dist = dist.get(&current.state).unwrap() + 1;
-            if tentative_dist < *dist.get(&n).unwrap_or(&u32::MAX) {
-                came_from.insert(n, *button);
+            if tentative_dist < *dist.get(&n).unwrap_or(&usize::MAX) {
+                // came_from.insert(n, *button); // if path is needed, we record it here
                 dist.insert(n, tentative_dist);
                 // save neighbour as candidate
                 // the heuristic must not overestimate the cost of reaching the target,
