@@ -1,26 +1,56 @@
-use std::ops::{Deref, DerefMut};
+use std::{
+    cmp::Reverse,
+    collections::{BinaryHeap, HashMap, VecDeque},
+    ops::{Deref, DerefMut},
+};
 
 use winnow::{
     Parser, Result,
     ascii::{dec_uint, newline},
-    combinator::{delimited, empty, repeat, separated, seq},
+    combinator::{delimited, repeat, separated, seq},
     token::one_of,
 };
 
 use crate::days::Day;
 
-#[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Hash)]
+#[derive(Copy, Clone, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct Lights(u16);
 
-#[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Hash)]
+impl std::fmt::Debug for Lights {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[")?;
+        write!(f, "{:b}", self.0)?;
+        write!(f, "]")
+    }
+}
+
+#[derive(Copy, Clone, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct Button(u16);
+
+impl std::fmt::Debug for Button {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "(")?;
+        for b in 0..16 {
+            let mask = 1 << b;
+            if self.0 & mask > 0 {
+                write!(f, "{b},")?;
+            }
+        }
+        write!(f, ")")
+    }
+}
 
 #[derive(Debug, Clone, Hash)]
 pub struct Machine {
-    current: Lights,
     target: Lights,
     buttons: Vec<Button>,
     joltages: Vec<u16>,
+}
+
+impl Lights {
+    fn press_button(self, button: Button) -> Self {
+        Lights(*self ^ *button)
+    }
 }
 
 impl From<&[bool]> for Lights {
@@ -73,6 +103,61 @@ impl DerefMut for Button {
     }
 }
 
+fn path(came_from: &HashMap<Lights, Button>, current: Lights) -> VecDeque<Button> {
+    let mut path: VecDeque<Button> = VecDeque::new();
+    let mut current = current;
+    while came_from.contains_key(&current) {
+        let button = *came_from.get(&current).unwrap();
+        current = current.press_button(button);
+        path.push_front(button);
+    }
+    path
+}
+
+fn a_star(buttons: &[Button], start: Lights, target: Lights) -> Option<usize> {
+    #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+    struct Candidate {
+        cost: Reverse<u32>,
+        state: Lights,
+    }
+    let mut open_set = BinaryHeap::<Candidate>::new(); // min-heap thanks to Reverse
+    open_set.push(Candidate {
+        cost: Reverse(1),
+        state: start,
+    });
+    let mut came_from = HashMap::<Lights, Button>::new(); // find back the path taken
+    let mut dist = HashMap::<Lights, u32>::new(); // travelled distance (number of buttons pressed)
+    dist.insert(start, 0);
+
+    while let Some(current) = open_set.pop() {
+        if current.state == target {
+            let path = path(&came_from, current.state);
+            return Some(path.len());
+        }
+
+        for button in buttons {
+            let n = current.state.press_button(*button);
+            // total number of button pressed if we pressed this button
+            let tentative_dist = dist.get(&current.state).unwrap() + 1;
+            if tentative_dist < *dist.get(&n).unwrap_or(&u32::MAX) {
+                came_from.insert(n, *button);
+                dist.insert(n, tentative_dist);
+                // save neighbour as candidate
+                // the heuristic must not overestimate the cost of reaching the target,
+                // so we use the minimum possible number of button presses (1)
+                let candidate = Candidate {
+                    cost: Reverse(tentative_dist + 1),
+                    state: n,
+                };
+                // replace this state in the min-heap
+                open_set.retain(|c| c.state != candidate.state);
+                open_set.push(candidate);
+            }
+        }
+    }
+    None
+}
+
 pub struct Day10;
 
 fn parse_lights(input: &mut &str) -> Result<Lights> {
@@ -101,7 +186,6 @@ fn parse_joltages(input: &mut &str) -> Result<Vec<u16>> {
 
 fn parse_machine(input: &mut &str) -> Result<Machine> {
     seq! {Machine {
-        current: empty.value(Lights(0)),
         target: parse_lights,
         _: ' ',
         buttons: parse_buttons,
@@ -121,13 +205,37 @@ impl Day for Day10 {
     type Output1 = usize;
 
     fn part_1(input: &Self::Input) -> Self::Output1 {
-        dbg!(input);
-        0
+        input
+            .iter()
+            .map(|machine| a_star(&machine.buttons, Lights::default(), machine.target).unwrap())
+            .sum()
     }
 
     type Output2 = usize;
 
     fn part_2(_input: &Self::Input) -> Self::Output2 {
         unimplemented!("part_2")
+    }
+}
+
+#[cfg(test)]
+#[expect(const_item_mutation)]
+mod tests {
+    use super::*;
+
+    const INPUT: &str = "[.##.] (3) (1,3) (2) (2,3) (0,2) (0,1) {3,5,4,7}
+[...#.] (0,2,3,4) (2,3) (0,4) (0,1,2) (1,2,3,4) {7,5,12,7,2}
+[.###.#] (0,1,2,3,4) (0,3,4) (0,1,2,4,5) (1,2) {10,11,11,5,10,5}";
+
+    #[test]
+    fn test_part1() {
+        let parsed = Day10::parser(&mut INPUT).unwrap();
+        assert_eq!(Day10::part_1(&parsed), 7);
+    }
+
+    #[test]
+    fn test_part2() {
+        let parsed = Day10::parser(&mut INPUT).unwrap();
+        assert_eq!(Day10::part_2(&parsed), 0);
     }
 }
