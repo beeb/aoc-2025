@@ -256,12 +256,11 @@ impl Day for Day10 {
                 // add a constraint that all button presses should equal to the joltage value
                 model = model.with(constraint!(jolt == sum));
             }
-            model.set_parameter("log", "0"); // disable logging
             let solution = model.solve().unwrap(); // magic 🪄
             // the sum of all variables is the total number of button presses, let's accumulate them
             res += vars
                 .into_iter()
-                .map(|v| solution.value(v) as usize)
+                .map(|v| solution.value(v).round() as usize)
                 .sum::<usize>();
         }
         res

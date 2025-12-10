@@ -14,7 +14,9 @@ cast_sign_loss = "allow"
 anyhow = "1.0.93"
 chrono = "0.4"
 clap = { version = "4", features = ["derive"] }
-good_lp = "1.14.2"
+good_lp = { version = "1.14.2", default-features = false, features = [
+    "microlp",
+] }
 itertools = "0.14"
 num = "0.4.3"
 petgraph = "0.8.3"
