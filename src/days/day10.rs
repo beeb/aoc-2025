@@ -4,6 +4,9 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
+use good_lp::{
+    Expression, Solution, SolverModel, Variable, constraint, default_solver, variable, variables,
+};
 use winnow::{
     Parser, Result,
     ascii::{dec_uint, newline},
@@ -213,9 +216,55 @@ impl Day for Day10 {
 
     type Output2 = usize;
 
-    fn part_2(_input: &Self::Input) -> Self::Output2 {
-        unimplemented!("part_2")
+    fn part_2(input: &Self::Input) -> Self::Output2 {
+        let mut res = 0;
+        for machine in input {
+            let mut problem = variables!();
+            let vars = machine.buttons.iter().map(|b| {
+                variable()
+                    .integer()
+                    .min(0)
+                    .max(max_button_presses(*b, &machine.joltages))
+            });
+            let vars: Vec<Variable> = problem.add_all(vars);
+            let objective: Expression = vars.iter().sum();
+            let mut model = problem.minimise(objective).using(default_solver);
+            for (i, jolt) in machine.joltages.iter().copied().enumerate() {
+                let buttons_idx = buttons_idx_for_joltage(i, &machine.buttons);
+                let sum: Expression = buttons_idx.into_iter().map(|i| vars[i]).sum();
+                let jolt = Expression::from_other_affine(jolt);
+                model = model.with(constraint!(jolt == sum));
+            }
+            let solution = model.solve().unwrap();
+            res += vars
+                .into_iter()
+                .map(|v| solution.value(v) as usize)
+                .sum::<usize>();
+        }
+        res
     }
+}
+
+fn buttons_idx_for_joltage(i: usize, buttons: &[Button]) -> Vec<usize> {
+    let mask = 1u16 << i;
+    buttons
+        .iter()
+        .enumerate()
+        .filter_map(|(i, b)| (**b & mask > 0).then_some(i))
+        .collect()
+}
+
+fn max_button_presses(mut button: Button, joltages: &[u16]) -> u16 {
+    let mut min = u16::MAX;
+    let mut b = 0;
+    while *button > 0 {
+        if button.trailing_ones() > 0 && joltages[b] < min {
+            min = joltages[b];
+        }
+        *button >>= 1;
+        b += 1;
+    }
+    min
 }
 
 #[cfg(test)]
@@ -236,6 +285,6 @@ mod tests {
     #[test]
     fn test_part2() {
         let parsed = Day10::parser(&mut INPUT).unwrap();
-        assert_eq!(Day10::part_2(&parsed), 0);
+        assert_eq!(Day10::part_2(&parsed), 33);
     }
 }

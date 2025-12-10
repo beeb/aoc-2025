@@ -22,10 +22,14 @@
         in
         {
           default = pkgs.mkShell {
-            buildInputs = [
+            buildInputs = with pkgs; [
+              cbc
+              clang
+              pkg-config
               toolchain
             ];
 
+            LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [ pkgs.cbc ];
             RUST_SRC_PATH = "${toolchain}/lib/rustlib/src/rust/library";
           };
         }
