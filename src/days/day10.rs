@@ -16,6 +16,9 @@ use winnow::{
 
 use crate::days::Day;
 
+/// A compact representation of the lights state for a machine
+///
+/// Each bit represents one light, with the LSB being the left-most light in the input.
 #[derive(Copy, Clone, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct Lights(u16);
 
@@ -27,6 +30,9 @@ impl std::fmt::Debug for Lights {
     }
 }
 
+/// A compact representation of a button (which lights it toggles)
+///
+/// Each bit corresponds to one light, with the LSB being the left-most light in the input.
 #[derive(Copy, Clone, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct Button(u16);
 
@@ -43,6 +49,7 @@ impl std::fmt::Debug for Button {
     }
 }
 
+/// A machine definition, with the required end state for the lights and the available buttons + required joltages
 #[derive(Debug, Clone, Hash)]
 pub struct Machine {
     target: Lights,
@@ -51,12 +58,14 @@ pub struct Machine {
 }
 
 impl Lights {
+    /// Press a button (toggle some lights)
     fn press_button(self, button: Button) -> Self {
-        Lights(*self ^ *button)
+        Lights(*self ^ *button) // noice
     }
 }
 
 impl From<&[bool]> for Lights {
+    /// Construct the compact representation from a list of booleans
     fn from(value: &[bool]) -> Self {
         let mut bits = 0;
         for (i, bit) in value.iter().enumerate() {
@@ -68,21 +77,8 @@ impl From<&[bool]> for Lights {
     }
 }
 
-impl Deref for Lights {
-    type Target = u16;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for Lights {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
 impl From<&[u8]> for Button {
+    /// Construct the compact representation from a list of light positions
     fn from(value: &[u8]) -> Self {
         let mut bits = 0;
         for bit in value {
@@ -92,20 +88,7 @@ impl From<&[u8]> for Button {
     }
 }
 
-impl Deref for Button {
-    type Target = u16;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for Button {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
+/// Reconstruct the path (which buttons were pressed in which order) for A*
 fn path(came_from: &HashMap<Lights, Button>, current: Lights) -> VecDeque<Button> {
     let mut path: VecDeque<Button> = VecDeque::new();
     let mut current = current;
@@ -117,6 +100,7 @@ fn path(came_from: &HashMap<Lights, Button>, current: Lights) -> VecDeque<Button
     path
 }
 
+/// Search the shortest sequence of button presses which leads to the target lights state with A*
 fn a_star(buttons: &[Button], start: Lights, target: Lights) -> Option<usize> {
     #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
     struct Candidate {
@@ -159,6 +143,30 @@ fn a_star(buttons: &[Button], start: Lights, target: Lights) -> Option<usize> {
         }
     }
     None
+}
+
+/// Retrieve the list of which buttons (index) increment a given joltage (identified by its position in the list)
+fn buttons_idx_for_joltage(i: usize, buttons: &[Button]) -> Vec<usize> {
+    let mask = 1u16 << i;
+    buttons
+        .iter()
+        .enumerate()
+        .filter_map(|(i, b)| (**b & mask > 0).then_some(i))
+        .collect()
+}
+
+/// Identify the maximum number of possible button presses before we exceed any of the desired joltages
+fn max_button_presses(mut button: Button, joltages: &[u16]) -> u16 {
+    let mut min = u16::MAX;
+    let mut b = 0;
+    while *button > 0 {
+        if button.trailing_ones() > 0 && joltages[b] < min {
+            min = joltages[b];
+        }
+        *button >>= 1;
+        b += 1;
+    }
+    min
 }
 
 pub struct Day10;
@@ -219,23 +227,34 @@ impl Day for Day10 {
     fn part_2(input: &Self::Input) -> Self::Output2 {
         let mut res = 0;
         for machine in input {
+            // the problem to solve is a set of linear equations
             let mut problem = variables!();
+            // the variables represent how many times we have to press each button
             let vars = machine.buttons.iter().map(|b| {
                 variable()
-                    .integer()
-                    .min(0)
-                    .max(max_button_presses(*b, &machine.joltages))
+                    .integer() // we're only interested in integer solutions
+                    .min(0) // values can't be negative
+                    .max(max_button_presses(*b, &machine.joltages)) // presses are bounded by the desired joltage
             });
             let vars: Vec<Variable> = problem.add_all(vars);
+            // the objective to minimize is the sum of all button presses
             let objective: Expression = vars.iter().sum();
             let mut model = problem.minimise(objective).using(default_solver);
+            // add constraints
             for (i, jolt) in machine.joltages.iter().copied().enumerate() {
+                // for each joltage, first retrieve which buttons can affect it
                 let buttons_idx = buttons_idx_for_joltage(i, &machine.buttons);
+                // construct an expression which is the sum of all button presses for the buttons that can affect
+                // this joltage
                 let sum: Expression = buttons_idx.into_iter().map(|i| vars[i]).sum();
+                // this is the target joltage
                 let jolt = Expression::from_other_affine(jolt);
+                // add a constraint that all button presses should equal to the joltage value
                 model = model.with(constraint!(jolt == sum));
             }
-            let solution = model.solve().unwrap();
+            model.set_parameter("log", "0"); // disable logging
+            let solution = model.solve().unwrap(); // magic 🪄
+            // the sum of all variables is the total number of button presses, let's accumulate them
             res += vars
                 .into_iter()
                 .map(|v| solution.value(v) as usize)
@@ -245,26 +264,32 @@ impl Day for Day10 {
     }
 }
 
-fn buttons_idx_for_joltage(i: usize, buttons: &[Button]) -> Vec<usize> {
-    let mask = 1u16 << i;
-    buttons
-        .iter()
-        .enumerate()
-        .filter_map(|(i, b)| (**b & mask > 0).then_some(i))
-        .collect()
+impl Deref for Lights {
+    type Target = u16;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
-fn max_button_presses(mut button: Button, joltages: &[u16]) -> u16 {
-    let mut min = u16::MAX;
-    let mut b = 0;
-    while *button > 0 {
-        if button.trailing_ones() > 0 && joltages[b] < min {
-            min = joltages[b];
-        }
-        *button >>= 1;
-        b += 1;
+impl DerefMut for Lights {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
-    min
+}
+
+impl Deref for Button {
+    type Target = u16;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for Button {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
 }
 
 #[cfg(test)]
