@@ -1,6 +1,6 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, hash::RandomState};
 
-use petgraph::{Graph, graph::NodeIndex};
+use petgraph::{Graph, algo::all_simple_paths, graph::NodeIndex};
 use winnow::{
     Parser as _, Result,
     ascii::{alpha1, newline},
@@ -50,8 +50,14 @@ impl Day for Day11 {
     type Output1 = usize;
 
     fn part_1(input: &Self::Input) -> Self::Output1 {
-        dbg!(input);
-        0
+        all_simple_paths::<Vec<_>, _, RandomState>(
+            &input.graph,
+            *input.nodes.get("you").unwrap(),
+            *input.nodes.get("out").unwrap(),
+            0,
+            None,
+        )
+        .count()
     }
 
     type Output2 = usize;
