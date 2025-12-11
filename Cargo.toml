@@ -19,6 +19,7 @@ good_lp = { version = "1.14.2", default-features = false, features = [
 ] }
 itertools = "0.14"
 num = "0.4.3"
+pathfinding = "4.14.0"
 petgraph = "0.8.3"
 ureq = "3.1.4"
 winnow = "0.7"
