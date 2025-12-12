@@ -10,22 +10,25 @@ use crate::days::Day;
 
 const SHAPE_SIZE: usize = 3;
 
+/// A shape rotation
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Rotation {
-    Identity,
     QuaterTurn,
     HalfTurn,
     ThreeQuarter,
 }
 
+/// A shape to place in the region
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Shape([[bool; SHAPE_SIZE]; SHAPE_SIZE]);
 
 impl Shape {
+    /// Get the area of a shape (how many tiles are occupied by it)
     fn area(&self) -> usize {
         self.0.iter().flatten().filter(|k| **k).count()
     }
 
+    /// Check whether we can place this shape at the (x, y) coordinate in the grid
     fn can_place(&self, grid: &[Vec<bool>], x: usize, y: usize) -> bool {
         for dy in 0..SHAPE_SIZE {
             for dx in 0..SHAPE_SIZE {
@@ -45,6 +48,7 @@ impl Shape {
         true
     }
 
+    /// Place this shape on the grid at (x, y)
     fn place(self, grid: &mut [Vec<bool>], x: usize, y: usize) {
         for dy in 0..SHAPE_SIZE {
             for dx in 0..SHAPE_SIZE {
@@ -55,6 +59,7 @@ impl Shape {
         }
     }
 
+    /// Remove this shape from (x, y)
     fn remove(self, grid: &mut [Vec<bool>], x: usize, y: usize) {
         for dy in 0..SHAPE_SIZE {
             for dx in 0..SHAPE_SIZE {
@@ -65,7 +70,7 @@ impl Shape {
         }
     }
 
-    /// Rotate 90 degress
+    /// Rotate 90 degrees
     fn rotate(self) -> Self {
         let mut out = [[false; SHAPE_SIZE]; SHAPE_SIZE];
         for y in 0..SHAPE_SIZE {
@@ -76,15 +81,16 @@ impl Shape {
         Shape(out)
     }
 
+    /// Rotate by the required amount
     fn rotate_to(self, rot: Rotation) -> Self {
         match rot {
-            Rotation::Identity => self,
             Rotation::QuaterTurn => self.rotate(),
             Rotation::HalfTurn => self.rotate().rotate(),
             Rotation::ThreeQuarter => self.rotate().rotate().rotate(),
         }
     }
 
+    /// Mirror the shape along its x-axis
     fn mirror(mut self) -> Self {
         for row in &mut self.0 {
             row.reverse();
@@ -94,17 +100,20 @@ impl Shape {
 }
 
 impl Ord for Shape {
+    /// Order shapes by their area
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.area().cmp(&other.area())
     }
 }
 
 impl PartialOrd for Shape {
+    /// Order shapes by their area
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
+/// A region where to place presents under the tree
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Region {
     width: usize,
@@ -112,16 +121,20 @@ pub struct Region {
     counts: Vec<usize>,
 }
 
+/// Today's puzzle input
 #[derive(Debug, Clone)]
 pub struct Puzzle {
     shapes: Vec<Shape>,
     regions: Vec<Region>,
 }
 
+/// Recursively try to pack all shapes into the region's grid
 fn pack(mut shapes_to_place: Vec<Shape>, mut grid: Vec<Vec<bool>>) -> bool {
     let Some(shape) = shapes_to_place.pop() else {
+        // all shapes are placed, success!
         return true;
     };
+    // all possible orientations
     let mut orientations = vec![
         shape,
         shape.rotate_to(Rotation::QuaterTurn),
@@ -132,23 +145,27 @@ fn pack(mut shapes_to_place: Vec<Shape>, mut grid: Vec<Vec<bool>>) -> bool {
         shape.rotate_to(Rotation::HalfTurn).mirror(),
         shape.rotate_to(Rotation::ThreeQuarter).mirror(),
     ];
+    // some might be duplicates (rotational symmetric or axisymmetrical parts), we should remove them
     orientations.sort_unstable_by_key(|s| s.0);
     orientations.dedup();
     for s in orientations {
         for x in 0..grid[0].len() {
             for y in 0..grid.len() {
+                // try to place on the grid, at the first available spot
                 if !s.can_place(&grid, x, y) {
                     continue;
                 }
                 s.place(&mut grid, x, y);
+                // try to place all other parts recursively
                 if pack(shapes_to_place.clone(), grid.clone()) {
+                    // all shapes are placed, success!
                     return true;
                 }
-                s.remove(&mut grid, x, y);
+                // we couldn't fit all the other parts, we have to continue trying
+                s.remove(&mut grid, x, y); // remove the shape we just placed to try other orientations
             }
         }
     }
-    shapes_to_place.push(shape);
     false
 }
 
@@ -220,7 +237,7 @@ impl Day for Day12 {
         let mut count = 0;
         for region in &input.regions {
             let mut shapes_to_place = Vec::new();
-            // largest shapes at the end = done first
+            // search with largest shapes first (= put them at the end of the list)
             for (count, shape) in region
                 .counts
                 .iter()
@@ -230,13 +247,16 @@ impl Day for Day12 {
                 shapes_to_place.extend(repeat_n(*shape, *count));
             }
 
+            // necessary optimization, some regions are too small to fit all shapes
             let total_area: usize = shapes_to_place.iter().map(Shape::area).sum();
             if total_area > region.width * region.height {
-                continue; // impossible to pack
+                continue; // impossible to pack, not enough space
             }
 
-            let grid = vec![vec![false; region.width]; region.height];
-            if pack(shapes_to_place, grid) {
+            if pack(
+                shapes_to_place,
+                vec![vec![false; region.width]; region.height],
+            ) {
                 count += 1;
             }
         }
@@ -246,6 +266,6 @@ impl Day for Day12 {
     type Output2 = usize;
 
     fn part_2(_input: &Self::Input) -> Self::Output2 {
-        unimplemented!("part_2")
+        0
     }
 }
