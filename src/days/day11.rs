@@ -22,6 +22,78 @@ pub struct Server {
     graph: Graph<String, ()>,
 }
 
+fn get_bridge_nodes(g: &Graph<String, ()>) -> Vec<(usize, NodeIndex)> {
+    toposort(g, None)
+        .unwrap()
+        .into_iter()
+        .enumerate()
+        .filter(|(_, n)| g.neighbors_directed(*n, Direction::Incoming).count() > 6)
+        .collect()
+}
+
+fn get_bridge_layers(
+    bridge_nodes: Vec<(usize, NodeIndex)>,
+    start: NodeIndex,
+    end: NodeIndex,
+) -> Vec<Vec<NodeIndex>> {
+    let mut bridge_layers = Vec::<Vec<_>>::new();
+    bridge_layers.push(vec![start]);
+    for (_, chunk) in &bridge_nodes
+        .into_iter()
+        .tuple_windows()
+        .chunk_by(|((i, _), (j, _))| (*i).abs_diff(*j) <= 20)
+    {
+        let nodes = chunk.into_iter().map(|((_, n), _)| n).collect_vec();
+        if nodes.len() == 1 {
+            bridge_layers
+                .last_mut()
+                .unwrap()
+                .push(*nodes.first().unwrap());
+        } else {
+            bridge_layers.push(nodes);
+        }
+    }
+    bridge_layers.push(vec![end]);
+    bridge_layers
+}
+
+fn count(
+    g: &Graph<String, ()>,
+    from: NodeIndex,
+    to: NodeIndex,
+    via: Option<NodeIndex>,
+    counts: &mut HashMap<NodeIndex, usize>,
+) {
+    let c = if let Some(via) = via {
+        let c1 = count_paths(
+            from,
+            |&n| g.neighbors_directed(n, Direction::Outgoing),
+            |&n| n == via,
+        );
+        let c2 = count_paths(
+            via,
+            |&n| g.neighbors_directed(n, Direction::Outgoing),
+            |&n| n == to,
+        );
+        // paths from start to end going through dac
+        c1 * c2
+    } else {
+        count_paths(
+            from,
+            |&n| g.neighbors_directed(n, Direction::Outgoing),
+            |&n| n == to,
+        )
+    };
+    // total paths reaching end through dac
+    let c = c * counts.get(&from).unwrap_or(&1);
+    counts
+        .entry(to)
+        .and_modify(|num| {
+            *num += c;
+        })
+        .or_insert(c);
+}
+
 pub struct Day11;
 
 fn parse_outputs<'a>(input: &mut &'a str) -> Result<Vec<&'a str>> {
@@ -68,40 +140,13 @@ impl Day for Day11 {
     type Output2 = usize;
 
     fn part_2(input: &Self::Input) -> Self::Output2 {
+        let svr = *input.nodes.get("svr").unwrap();
         let out = *input.nodes.get("out").unwrap();
-        let bridge_nodes = toposort(&input.graph, None)
-            .unwrap()
-            .into_iter()
-            .enumerate()
-            .filter(|(_, n)| {
-                input
-                    .graph
-                    .neighbors_directed(*n, Direction::Incoming)
-                    .count()
-                    > 6
-            })
-            .collect_vec();
-        let mut bridge_layers = Vec::<Vec<_>>::new();
-        bridge_layers.push(vec![*input.nodes.get("svr").unwrap()]);
-        for (_, chunk) in &bridge_nodes
-            .into_iter()
-            .tuple_windows()
-            .chunk_by(|((i, _), (j, _))| (*i).abs_diff(*j) <= 20)
-        {
-            let nodes = chunk.into_iter().map(|((_, n), _)| n).collect_vec();
-            if nodes.len() == 1 {
-                bridge_layers
-                    .last_mut()
-                    .unwrap()
-                    .push(*nodes.first().unwrap());
-            } else {
-                bridge_layers.push(nodes);
-            }
-        }
-        bridge_layers.push(vec![out]);
-        let mut num_paths = HashMap::<NodeIndex, usize>::new();
         let dac = *input.nodes.get("dac").unwrap();
         let fft = *input.nodes.get("fft").unwrap();
+        let bridge_nodes = get_bridge_nodes(&input.graph);
+        let bridge_layers = get_bridge_layers(bridge_nodes, svr, out);
+        let mut num_paths = HashMap::<NodeIndex, usize>::new();
         for (start_layer, end_layer) in bridge_layers.iter().tuple_windows() {
             // disconnect output
             let mut g = input.graph.clone();
@@ -121,26 +166,7 @@ impl Day for Day11 {
                 // special group with dac, only count paths going through dac
                 for start in start_layer {
                     for end in end_layer {
-                        let c1 = count_paths(
-                            *start,
-                            |&n| input.graph.neighbors_directed(n, Direction::Outgoing),
-                            |&n| n == dac,
-                        );
-                        let c2 = count_paths(
-                            dac,
-                            |&n| input.graph.neighbors_directed(n, Direction::Outgoing),
-                            |n| n == end,
-                        );
-                        // paths from start to end going through dac
-                        let c = c1 * c2;
-                        // total paths reaching end through dac
-                        let c = c * num_paths.get(start).unwrap_or(&1);
-                        num_paths
-                            .entry(*end)
-                            .and_modify(|num| {
-                                *num += c;
-                            })
-                            .or_insert(c);
+                        count(&input.graph, *start, *end, Some(dac), &mut num_paths);
                     }
                 }
                 continue;
@@ -151,46 +177,14 @@ impl Day for Day11 {
                 // special group with fft, only count paths going through dac
                 for start in start_layer {
                     for end in end_layer {
-                        let c1 = count_paths(
-                            *start,
-                            |&n| input.graph.neighbors_directed(n, Direction::Outgoing),
-                            |&n| n == fft,
-                        );
-                        let c2 = count_paths(
-                            fft,
-                            |&n| input.graph.neighbors_directed(n, Direction::Outgoing),
-                            |n| n == end,
-                        );
-                        // paths from start to end going through fft
-                        let c = c1 * c2;
-                        // total paths reaching end through fft
-                        let c = c * num_paths.get(start).unwrap_or(&1);
-                        num_paths
-                            .entry(*end)
-                            .and_modify(|num| {
-                                *num += c;
-                            })
-                            .or_insert(c);
+                        count(&input.graph, *start, *end, Some(fft), &mut num_paths);
                     }
                 }
                 continue;
             }
             for start in start_layer {
                 for end in end_layer {
-                    // paths from start to end
-                    let c = count_paths(
-                        *start,
-                        |&n| input.graph.neighbors_directed(n, Direction::Outgoing),
-                        |n| n == end,
-                    );
-                    // total paths reaching end
-                    let c = c * num_paths.get(start).unwrap_or(&1);
-                    num_paths
-                        .entry(*end)
-                        .and_modify(|num| {
-                            *num += c;
-                        })
-                        .or_insert(c);
+                    count(&input.graph, *start, *end, None, &mut num_paths);
                 }
             }
         }
