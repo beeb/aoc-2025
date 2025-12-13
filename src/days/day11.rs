@@ -75,7 +75,7 @@ fn count(
             |&n| g.neighbors_directed(n, Direction::Outgoing),
             |&n| n == to,
         );
-        // paths from start to end going through dac
+        // paths from `from` to `end` going through the via node
         c1 * c2
     } else {
         count_paths(
@@ -84,7 +84,7 @@ fn count(
             |&n| n == to,
         )
     };
-    // total paths reaching end through dac
+    // total paths reaching the `to` node
     let c = c * counts.get(&from).unwrap_or(&1);
     counts
         .entry(to)
